@@ -57,11 +57,21 @@ jobs:
           ALLOW_EXISTING: ${{ inputs.allow_existing }}
         run: node scripts/chat-stage.mjs ci
       - uses: actions/upload-artifact@v4
+        id: stage_artifact
         if: success() && env.STAGE_RUN == 'true'
         with:
           name: tdd-stage-${{ github.sha }}-${{ github.run_attempt }}
           path: test-results/stage/
           if-no-files-found: error
+      - name: Emit verified TDD receipt
+        if: success() && env.STAGE_RUN == 'true' && steps.stage_artifact.outcome == 'success'
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const source = JSON.parse(readFileSync('test-results/stage/source.json', 'utf8'));
+          const evidence = JSON.parse(readFileSync('test-results/stage/evidence.json', 'utf8'));
+          console.log('TDD_RECEIPT=' + JSON.stringify({ source, evidence }));
+          NODE
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
