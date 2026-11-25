@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { acceptedTestHash } from './stage-hash.mjs';
 
 process.chdir(fileURLToPath(new URL('../', import.meta.url)));
 const read = path => JSON.parse(readFileSync(path, 'utf8'));
@@ -14,7 +15,7 @@ function nextStage() {
       const path = join('evidence', item.id, phase + '.json');
       if (!existsSync(path)) return { ...item, phase, path };
       const record = read(path);
-      const hash = createHash('sha256').update(readFileSync(item.file)).digest('hex');
+      const hash = acceptedTestHash(item);
       if (record.hash !== hash || record.file !== item.file || record.id !== item.id || record.phase !== phase) {
         throw Error('Evidence/test mismatch: ' + path);
       }

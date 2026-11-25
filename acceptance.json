@@ -15,7 +15,13 @@
     "id": "LP-003",
     "title": "帳號與持久化",
     "accept": "React/TypeScript 介面可註冊及登入 Express API，PostgreSQL 儲存資料；測試另一工作階段可讀自己的資料，另一帳號無法讀寫。",
-    "file": "app/acceptance/LP-003.test.ts"
+    "file": "app/acceptance/LP-003.test.ts",
+    "testRevision": {
+      "acceptedFile": "evidence/LP-003/accepted-test.txt",
+      "currentHash": "9e75de5b8d45c1ee74c6fd51a9ecd102597162fa0bc24564189e7c69fef11ee3",
+      "originalCommit": "37234a6509adce73c32bb8b39ee71fb53272ccb3",
+      "reason": "分開首次載入與重新整理的瀏覽器回應，並保留全部隔離斷言。"
+    }
   },
   {
     "id": "LP-004",

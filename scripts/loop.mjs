@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { contextFile, directory, excerpt, pendingFile, read as readRecord, replyPath, writeRecord } from './handoff.mjs';
 import { waitForQuota } from './quota.mjs';
+import { acceptedTestHash } from './stage-hash.mjs';
 
 process.chdir(fileURLToPath(new URL('../', import.meta.url)));
 const read = path => JSON.parse(readFileSync(path, 'utf8'));
@@ -24,7 +25,7 @@ function stage(item) {
     if (!existsSync(file)) return phase;
     const record = read(file);
     if (record.file !== item.file || record.id !== item.id || record.phase !== phase ||
-        record.hash !== digest(item.file)) throw Error('Evidence/test mismatch: ' + file);
+        record.hash !== acceptedTestHash(item)) throw Error('Evidence/test mismatch: ' + file);
   }
   return 'done';
 }

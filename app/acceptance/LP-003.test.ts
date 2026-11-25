@@ -95,14 +95,18 @@ test('LP-003: UI accounts persist in PostgreSQL across sessions and deny another
     expect(await ownRead.json()).toMatchObject({ id: saved.id, title: event.title });
 
     const otherContext = await browser.newContext({ timezoneId: 'Asia/Taipei' });
-    const other = await otherContext.newPage();
-    const userB = await authenticate(other, 'register', accountB);
+    const otherLogin = await otherContext.newPage();
+    const userB = await authenticate(otherLogin, 'register', accountB);
     expect(userB.id).not.toBe(userA.id);
     await otherContext.clearCookies();
-    expect((await authenticate(other, 'login', accountB)).id).toBe(userB.id);
+    expect((await authenticate(otherLogin, 'login', accountB)).id).toBe(userB.id);
     const storedB = await database.query('SELECT id FROM users WHERE email = $1', [accountB]);
     expect(storedB.rows).toEqual([{ id: userB.id }]);
+    await otherLogin.close();
+    const other = await otherContext.newPage();
+    const initialOtherUiList = apiResponse(other, '/api/events', 'GET');
     await other.goto(app.url);
+    expect(await jsonBody(await initialOtherUiList, 200)).toEqual([]);
     const otherUiList = apiResponse(other, '/api/events', 'GET');
     await other.reload();
     expect(await jsonBody(await otherUiList, 200)).toEqual([]);
