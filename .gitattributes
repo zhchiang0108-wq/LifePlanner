@@ -1,0 +1,2 @@
+# The TDD evidence records the exact bytes of each acceptance file.
+*.test.ts text eol=lf
