@@ -1,0 +1,31 @@
+{
+  "phase": "refactor",
+  "baseline": false,
+  "id": "LP-009",
+  "time": "2026-11-25T06:08:20.369Z",
+  "file": "app/acceptance/LP-009.test.ts",
+  "hash": "c6d576f9418ce1fadc1bdf180559b3b51331447c3fbbedf8c2ae3900a338b6f4",
+  "expected": "LP-009: stale overlap confirmation rejects a new conflict from another session until explicitly reconfirmed",
+  "result": {
+    "exit": 0,
+    "cases": [
+      {
+        "name": "LP-009: stale overlap confirmation rejects a new conflict from another session until explicitly reconfirmed",
+        "passed": true,
+        "code": null,
+        "message": ""
+      }
+    ],
+    "stderr": ""
+  },
+  "source": {
+    "repository": "zhchiang0108-wq/LifePlanner",
+    "commit": "dfcbf606e8d64741daa20d885edf84ac294466ca",
+    "runId": "45558203755",
+    "attempt": "1",
+    "id": "LP-009",
+    "phase": "refactor",
+    "file": "app/acceptance/LP-009.test.ts",
+    "hash": "c6d576f9418ce1fadc1bdf180559b3b51331447c3fbbedf8c2ae3900a338b6f4"
+  }
+}
