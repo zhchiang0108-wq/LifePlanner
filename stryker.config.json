@@ -1,0 +1,10 @@
+{
+  "mutate": ["src/overlaps.ts"],
+  "testRunner": "command",
+  "commandRunner": {
+    "command": "node --test --test-isolation=none tests/adjacent.test.ts tests/reverse-adjacent.test.ts tests/LP-002.test.ts tests/properties/overlaps.test.ts"
+  },
+  "ignorePatterns": [".runtime", "evidence", "app", "test-results", "reports"],
+  "coverageAnalysis": "off",
+  "reporters": ["clear-text", "html", "json"]
+}

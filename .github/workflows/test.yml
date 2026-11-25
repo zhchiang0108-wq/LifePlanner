@@ -1,0 +1,87 @@
+name: Planner regression
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      case_id:
+        description: '驗收案例，例如 LP-009；留白執行一般回歸及變異測試'
+        type: string
+        required: false
+      phase:
+        description: '指定案例時使用的 TDD 階段'
+        type: choice
+        options: [red, green, refactor]
+        default: red
+      allow_existing:
+        description: 'Red 首次已通過時，記為既有行為基準'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: planner_test
+          POSTGRES_PASSWORD: ci_test
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      STAGE_RUN: ${{ (github.event_name == 'workflow_dispatch' && inputs.case_id != '') || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/tdd/')) }}
+      TEST_DATABASE_URL: postgresql://postgres:ci_test@127.0.0.1:5432/planner_test
+      DATABASE_URL: postgresql://postgres:ci_test@127.0.0.1:5432/planner_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install project dependencies when application is initialized
+        if: ${{ hashFiles('package.json') != '' }}
+        run: npm ci
+      - name: Install Chromium for application acceptance tests
+        if: ${{ hashFiles('app/acceptance/*.test.ts') != '' }}
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Regression
+        if: env.STAGE_RUN != 'true'
+        run: /usr/bin/time -a -o "$GITHUB_STEP_SUMMARY" -f 'Full regression elapsed %E' npm run check
+      - name: Verify requested TDD stage
+        if: env.STAGE_RUN == 'true'
+        env:
+          CASE_ID: ${{ inputs.case_id }}
+          PHASE: ${{ inputs.phase }}
+          ALLOW_EXISTING: ${{ inputs.allow_existing }}
+        run: node scripts/chat-stage.mjs ci
+      - uses: actions/upload-artifact@v4
+        if: success() && env.STAGE_RUN == 'true'
+        with:
+          name: tdd-stage-${{ github.sha }}-${{ github.run_attempt }}
+          path: test-results/stage/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-traces
+          path: test-results/traces/**/*.zip
+          if-no-files-found: ignore
+          retention-days: 7
+  mutation:
+    if: github.event_name == 'workflow_dispatch' && inputs.case_id == ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci
+      - run: npm run test:mutation
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: overlap-mutation
+          path: reports/mutation/
+          if-no-files-found: ignore

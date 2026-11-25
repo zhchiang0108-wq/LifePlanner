@@ -1,0 +1,21 @@
+{
+  "phase": "red",
+  "baseline": false,
+  "id": "LP-010",
+  "time": "2026-11-24T07:59:18.349Z",
+  "file": "app/acceptance/LP-010.test.ts",
+  "hash": "72cc20529238ea663ebcf7e421753a0afe92b293d256c3c543ebebe3cadc8122",
+  "expected": "LP-010: hidden events and unscheduled tasks show persisted reminders at the edited Taipei time",
+  "result": {
+    "exit": 1,
+    "cases": [
+      {
+        "name": "LP-010: hidden events and unscheduled tasks show persisted reminders at the edited Taipei time",
+        "passed": false,
+        "code": "ERR_ASSERTION",
+        "message": "AssertionError: expected '<section aria-label=\"待辦編輯\" id=\"task-e…' to contain '待辦提醒時間'"
+      }
+    ],
+    "stderr": ""
+  }
+}

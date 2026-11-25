@@ -1,0 +1,21 @@
+{
+  "phase": "green",
+  "baseline": false,
+  "id": "LP-008",
+  "time": "2026-11-23T12:25:22.172Z",
+  "file": "app/acceptance/LP-008.test.ts",
+  "hash": "151713662dcf5ad395e1399e552ba3ff4dcb82b066694ce2214fe93fd19f706c",
+  "expected": "LP-008: event/task creation and rescheduling disclose conflicts, cancel, revise or explicitly confirm; exclude self and touching intervals",
+  "result": {
+    "exit": 0,
+    "cases": [
+      {
+        "name": "LP-008: event/task creation and rescheduling disclose conflicts, cancel, revise or explicitly confirm; exclude self and touching intervals",
+        "passed": true,
+        "code": null,
+        "message": ""
+      }
+    ],
+    "stderr": ""
+  }
+}

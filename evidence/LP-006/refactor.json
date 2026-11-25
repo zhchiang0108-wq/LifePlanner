@@ -1,0 +1,21 @@
+{
+  "phase": "refactor",
+  "baseline": false,
+  "id": "LP-006",
+  "time": "2026-11-23T10:52:49.748Z",
+  "file": "app/acceptance/LP-006.test.ts",
+  "hash": "ba9904275a61241262af2a6100c9ed0ea9667a5bdfa1edd9a49ef86287a7d25c",
+  "expected": "LP-006: hiding frees overlap width, retains day/week list details, and show/edit/restore synchronize between sessions",
+  "result": {
+    "exit": 0,
+    "cases": [
+      {
+        "name": "LP-006: hiding frees overlap width, retains day/week list details, and show/edit/restore synchronize between sessions",
+        "passed": true,
+        "code": null,
+        "message": ""
+      }
+    ],
+    "stderr": ""
+  }
+}

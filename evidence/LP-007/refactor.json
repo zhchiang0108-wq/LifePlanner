@@ -1,0 +1,21 @@
+{
+  "phase": "refactor",
+  "baseline": false,
+  "id": "LP-007",
+  "time": "2026-11-23T12:21:20.037Z",
+  "file": "app/acceptance/LP-007.test.ts",
+  "hash": "08849f42c8827c881622756cb567956843dc8818ac076fbf5dc0cd43ef1d0bff",
+  "expected": "LP-007: create an unscheduled task, schedule among events, and persist completion across independent sessions",
+  "result": {
+    "exit": 0,
+    "cases": [
+      {
+        "name": "LP-007: create an unscheduled task, schedule among events, and persist completion across independent sessions",
+        "passed": true,
+        "code": null,
+        "message": ""
+      }
+    ],
+    "stderr": ""
+  }
+}

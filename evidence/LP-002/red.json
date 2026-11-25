@@ -1,0 +1,19 @@
+{
+  "phase": "red",
+  "baseline": true,
+  "id": "LP-002",
+  "time": "2026-11-23T06:35:36.402Z",
+  "file": "tests/LP-002.test.ts",
+  "hash": "2bfa40bd9102c59fe72555ea93d667902623f3bf248b8101b757fb28dafcb919",
+  "expected": "LP-002: overlap boundaries report conflicts and separated slots remain conflict-free",
+  "result": {
+    "exit": 0,
+    "cases": [
+      {
+        "name": "LP-002: overlap boundaries report conflicts and separated slots remain conflict-free",
+        "passed": true
+      }
+    ],
+    "stderr": ""
+  }
+}

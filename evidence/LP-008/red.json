@@ -1,0 +1,21 @@
+{
+  "phase": "red",
+  "baseline": false,
+  "id": "LP-008",
+  "time": "2026-11-23T12:23:32.197Z",
+  "file": "app/acceptance/LP-008.test.ts",
+  "hash": "151713662dcf5ad395e1399e552ba3ff4dcb82b066694ce2214fe93fd19f706c",
+  "expected": "LP-008: event/task creation and rescheduling disclose conflicts, cancel, revise or explicitly confirm; exclude self and touching intervals",
+  "result": {
+    "exit": 1,
+    "cases": [
+      {
+        "name": "LP-008: event/task creation and rescheduling disclose conflicts, cancel, revise or explicitly confirm; exclude self and touching intervals",
+        "passed": false,
+        "code": "ERR_ASSERTION",
+        "message": "AssertionError: Conflict message must include 2026-12-01-一般行程: expected '時段重疊：2026-12-01-已排程待辦 (2026-12-01T03:…' to contain '2026-12-01-一般行程'"
+      }
+    ],
+    "stderr": ""
+  }
+}

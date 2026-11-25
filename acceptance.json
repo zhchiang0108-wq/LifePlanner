@@ -1,0 +1,104 @@
+[
+  {
+    "id": "LP-001",
+    "title": "相鄰時段",
+    "accept": "09:00–10:00 和 10:00–11:00 不衝突。",
+    "file": "tests/adjacent.test.ts"
+  },
+  {
+    "id": "LP-002",
+    "title": "重疊邊界",
+    "accept": "部分重疊一分鐘、包含及相同時段皆衝突，分離不衝突。",
+    "file": "tests/LP-002.test.ts"
+  },
+  {
+    "id": "LP-003",
+    "title": "帳號與持久化",
+    "accept": "React/TypeScript 介面可註冊及登入 Express API，PostgreSQL 儲存資料；測試另一工作階段可讀自己的資料，另一帳號無法讀寫。",
+    "file": "app/acceptance/LP-003.test.ts"
+  },
+  {
+    "id": "LP-004",
+    "title": "日週行事曆",
+    "accept": "在日、週時間格新增、修改、刪除行程，重新整理後呈現儲存結果。",
+    "file": "app/acceptance/LP-004.test.ts"
+  },
+  {
+    "id": "LP-005",
+    "title": "日週清單",
+    "accept": "顯示名稱和起訖時間，全天置頂、週按日分組、日內排序。可前後切換及回到今天。",
+    "file": "app/acceptance/LP-005.test.ts"
+  },
+  {
+    "id": "LP-006",
+    "title": "隱藏與復原",
+    "accept": "隱藏後重疊行程恢復完整寬度。日週清單保留標記與時間。切換顯示、編輯、復原後兩裝置一致。",
+    "file": "app/acceptance/LP-006.test.ts"
+  },
+  {
+    "id": "LP-007",
+    "title": "待辦",
+    "accept": "建立未排程待辦，指定時段後與行程一起排序，可標記完成。",
+    "file": "app/acceptance/LP-007.test.ts"
+  },
+  {
+    "id": "LP-008",
+    "title": "衝突確認",
+    "accept": "新增和改期遇到行程、隱藏項目或已排程待辦，顯示名稱與時段，可取消、改期或確認儲存。排除自身與相接時段。",
+    "file": "app/acceptance/LP-008.test.ts"
+  },
+  {
+    "id": "LP-009",
+    "title": "跨裝置寫入",
+    "accept": "確認前另一工作階段插入新衝突，後端以最新資料重查，對新衝突取得確認才寫入。",
+    "file": "app/acceptance/LP-009.test.ts"
+  },
+  {
+    "id": "LP-010",
+    "title": "提醒",
+    "accept": "事件與待辦可設定應用內提醒。固定時鐘驗證到期前與到期當刻，隱藏後照常提醒、修改後依新時間觸發。",
+    "file": "app/acceptance/LP-010.test.ts"
+  },
+  {
+    "id": "LP-011",
+    "title": "重複事件",
+    "accept": "選取每週星期及結束日，驗證最後一期與下一週。更新或刪除系列時同步處理未來行程與提醒。",
+    "file": "app/acceptance/LP-011.test.ts"
+  },
+  {
+    "id": "LP-012",
+    "title": "記帳",
+    "accept": "記錄金額類別與日期，計算日、週支出，驗證跨日、跨週歸屬。",
+    "file": "app/acceptance/LP-012.test.ts"
+  },
+  {
+    "id": "LP-013",
+    "title": "快速新增",
+    "accept": "手機首頁的記帳、加待辦及加行程表單可實際寫入並更新清單。",
+    "file": "app/acceptance/LP-013.test.ts"
+  },
+  {
+    "id": "LP-014",
+    "title": "今日總覽",
+    "accept": "顯示下一行程、今日待辦、到期提醒及今日支出，操作入口可開啟對應功能。",
+    "file": "app/acceptance/LP-014.test.ts"
+  },
+  {
+    "id": "LP-015",
+    "title": "每週回顧",
+    "accept": "檢視已完成與未完成待辦及各類別支出；將選定未完成待辦延到下週，兩週清單與統計同步。",
+    "file": "app/acceptance/LP-015.test.ts"
+  },
+  {
+    "id": "LP-016",
+    "title": "搜尋與篩選",
+    "accept": "關鍵字可找到過去及隱藏的行程、待辦。日期加類別只列兩者皆符合的支出。",
+    "file": "app/acceptance/LP-016.test.ts"
+  },
+  {
+    "id": "LP-017",
+    "title": "跨裝置端到端",
+    "accept": "Playwright 兩個獨立 context 以同一帳號實際操作桌面與行動介面。覆蓋行程、待辦、提醒、記帳和隱藏設定重新整理後的同步，再用另一帳號確認隔離。測試納入 npm test，交付可重現的啟動方式及資料庫設定。",
+    "file": "app/acceptance/LP-017.test.ts"
+  }
+]

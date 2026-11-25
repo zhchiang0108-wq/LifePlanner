@@ -1,0 +1,19 @@
+{
+  "phase": "refactor",
+  "baseline": false,
+  "id": "LP-001",
+  "time": "2026-11-23T06:34:53.592Z",
+  "file": "tests/adjacent.test.ts",
+  "hash": "a22308dc26b5d5503054e508e3d400df18a9ac3a67d3f9764ac196d8c088adcd",
+  "expected": "09:00-10:00 followed by 10:00-11:00 is conflict-free",
+  "result": {
+    "exit": 0,
+    "cases": [
+      {
+        "name": "09:00-10:00 followed by 10:00-11:00 is conflict-free",
+        "passed": true
+      }
+    ],
+    "stderr": ""
+  }
+}

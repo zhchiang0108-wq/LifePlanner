@@ -1,0 +1,21 @@
+{
+  "phase": "red",
+  "baseline": false,
+  "id": "LP-004",
+  "time": "2026-11-23T10:31:25.745Z",
+  "file": "app/acceptance/LP-004.test.ts",
+  "hash": "4fd58e203599958cdc0859ba2bec19e4fb0452f79e3cd1522bc6ec938468bd0c",
+  "expected": "LP-004: day and week time grids create, reschedule and delete persisted events after reload",
+  "result": {
+    "exit": 1,
+    "cases": [
+      {
+        "name": "LP-004: day and week time grids create, reschedule and delete persisted events after reload",
+        "passed": false,
+        "code": "ERR_ASSERTION",
+        "message": "AssertionError: Expected visible calendar UI: getByRole('button', { name: '日', exact: true }): expected false to be true // Object.is equality"
+      }
+    ],
+    "stderr": ""
+  }
+}

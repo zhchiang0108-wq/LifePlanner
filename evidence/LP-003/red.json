@@ -1,0 +1,21 @@
+{
+  "phase": "red",
+  "baseline": false,
+  "id": "LP-003",
+  "time": "2026-11-23T07:03:58.422Z",
+  "file": "app/acceptance/LP-003.test.ts",
+  "hash": "ca051d102b63625e592e1dd667d1623a64acf565a6a4d00b0a74f175674863ca",
+  "expected": "LP-003: UI accounts persist in PostgreSQL across sessions and deny another account access",
+  "result": {
+    "exit": 1,
+    "cases": [
+      {
+        "name": "LP-003: UI accounts persist in PostgreSQL across sessions and deny another account access",
+        "passed": false,
+        "code": "ERR_ASSERTION",
+        "message": "AssertionError: The real account UI must be served: expected 501 to be 200 // Object.is equality"
+      }
+    ],
+    "stderr": ""
+  }
+}

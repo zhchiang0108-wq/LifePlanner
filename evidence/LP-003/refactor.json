@@ -1,0 +1,21 @@
+{
+  "phase": "refactor",
+  "baseline": false,
+  "id": "LP-003",
+  "time": "2026-11-23T10:28:23.656Z",
+  "file": "app/acceptance/LP-003.test.ts",
+  "hash": "ca051d102b63625e592e1dd667d1623a64acf565a6a4d00b0a74f175674863ca",
+  "expected": "LP-003: UI accounts persist in PostgreSQL across sessions and deny another account access",
+  "result": {
+    "exit": 0,
+    "cases": [
+      {
+        "name": "LP-003: UI accounts persist in PostgreSQL across sessions and deny another account access",
+        "passed": true,
+        "code": null,
+        "message": ""
+      }
+    ],
+    "stderr": ""
+  }
+}

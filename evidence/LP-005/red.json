@@ -1,0 +1,21 @@
+{
+  "phase": "red",
+  "baseline": false,
+  "id": "LP-005",
+  "time": "2026-11-23T10:38:08.415Z",
+  "file": "app/acceptance/LP-005.test.ts",
+  "hash": "335b752f5ad7395f0b4ffb9f5f2aaf39b6ae0d9d6c674c9f366de5d5c3fcae06",
+  "expected": "LP-005: persisted day/week lists show times, put all-day first, group and sort, and follow date navigation",
+  "result": {
+    "exit": 1,
+    "cases": [
+      {
+        "name": "LP-005: persisted day/week lists show times, put all-day first, group and sort, and follow date navigation",
+        "passed": false,
+        "code": "ERR_ASSERTION",
+        "message": "AssertionError: Expected visible LP-005 UI: getByRole('checkbox', { name: '全天', exact: true }): expected false to be true // Object.is equality"
+      }
+    ],
+    "stderr": ""
+  }
+}
