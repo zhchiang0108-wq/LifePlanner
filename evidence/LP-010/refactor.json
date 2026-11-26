@@ -1,0 +1,31 @@
+{
+  "phase": "refactor",
+  "baseline": false,
+  "id": "LP-010",
+  "time": "2026-11-26T02:36:16.750Z",
+  "file": "app/acceptance/LP-010.test.ts",
+  "hash": "72cc20529238ea663ebcf7e421753a0afe92b293d256c3c543ebebe3cadc8122",
+  "expected": "LP-010: hidden events and unscheduled tasks show persisted reminders at the edited Taipei time",
+  "result": {
+    "exit": 0,
+    "cases": [
+      {
+        "name": "LP-010: hidden events and unscheduled tasks show persisted reminders at the edited Taipei time",
+        "passed": true,
+        "code": null,
+        "message": ""
+      }
+    ],
+    "stderr": ""
+  },
+  "source": {
+    "repository": "zhchiang0108-wq/LifePlanner",
+    "commit": "445d5bfc66ad58063f9b906563125216710a6059",
+    "runId": "45743378623",
+    "attempt": "1",
+    "id": "LP-010",
+    "phase": "refactor",
+    "file": "app/acceptance/LP-010.test.ts",
+    "hash": "72cc20529238ea663ebcf7e421753a0afe92b293d256c3c543ebebe3cadc8122"
+  }
+}
