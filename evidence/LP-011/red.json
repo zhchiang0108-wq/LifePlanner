@@ -1,0 +1,31 @@
+{
+  "phase": "red",
+  "baseline": false,
+  "id": "LP-011",
+  "time": "2026-11-26T02:44:57.052Z",
+  "file": "app/acceptance/LP-011.test.ts",
+  "hash": "6ec38edd5184ef7c981e8b6d909fdb4a0805e176fbe77010cdd5af33daec5ef5",
+  "expected": "LP-011: chosen weekly weekdays include the end date, and series changes preserve past events and reminders",
+  "result": {
+    "exit": 1,
+    "cases": [
+      {
+        "name": "LP-011: chosen weekly weekdays include the end date, and series changes preserve past events and reminders",
+        "passed": false,
+        "code": "ERR_ASSERTION",
+        "message": "AssertionError: The event editor must offer weekly repetition: expected +0 to be 1 // Object.is equality\n    at /home/runner/work/LifePlanner/LifePlanner/app/acceptance/LP-011.test.ts:43:83\n    at file:///home/runner/work/LifePlanner/LifePlanner/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+      }
+    ],
+    "stderr": ""
+  },
+  "source": {
+    "repository": "zhchiang0108-wq/LifePlanner",
+    "commit": "f866f41a6d3b6c48a30a7ed3265e1cce36b906a0",
+    "runId": "45744358994",
+    "attempt": "1",
+    "id": "LP-011",
+    "phase": "red",
+    "file": "app/acceptance/LP-011.test.ts",
+    "hash": "6ec38edd5184ef7c981e8b6d909fdb4a0805e176fbe77010cdd5af33daec5ef5"
+  }
+}
