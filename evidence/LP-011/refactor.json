@@ -1,0 +1,31 @@
+{
+  "phase": "refactor",
+  "baseline": false,
+  "id": "LP-011",
+  "time": "2026-11-27T03:05:16.368Z",
+  "file": "app/acceptance/LP-011.test.ts",
+  "hash": "6ec38edd5184ef7c981e8b6d909fdb4a0805e176fbe77010cdd5af33daec5ef5",
+  "expected": "LP-011: chosen weekly weekdays include the end date, and series changes preserve past events and reminders",
+  "result": {
+    "exit": 0,
+    "cases": [
+      {
+        "name": "LP-011: chosen weekly weekdays include the end date, and series changes preserve past events and reminders",
+        "passed": true,
+        "code": null,
+        "message": ""
+      }
+    ],
+    "stderr": ""
+  },
+  "source": {
+    "repository": "zhchiang0108-wq/LifePlanner",
+    "commit": "c56bce1e74f0795eedf2d3673266166418c514de",
+    "runId": "45931958377",
+    "attempt": "1",
+    "id": "LP-011",
+    "phase": "refactor",
+    "file": "app/acceptance/LP-011.test.ts",
+    "hash": "6ec38edd5184ef7c981e8b6d909fdb4a0805e176fbe77010cdd5af33daec5ef5"
+  }
+}
