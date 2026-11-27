@@ -65,12 +65,33 @@ function App() {
   const [showHidden, setShowHidden] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirmationToken, setConfirmationToken] = useState<string>();
+  const [recurrence, setRecurrence] = useState<EventInput['recurrence']>();
+  const finishedSeries = !!editing?.seriesId && !events.some(item => item.seriesId === editing.seriesId && Date.parse(item.start) >= Date.now());
+  function changeDraft(patch: Partial<typeof draft>) {
+    setConfirmationToken(undefined);
+    setDraft(current => ({ ...current, ...patch, confirmOverlap: false }));
+  }
+  function changeRecurrence(next: EventInput['recurrence']) {
+    setRecurrence(next);
+    changeDraft({});
+  }
+  function eventInput(): EventInput {
+    if (finishedSeries) throw new Error('此系列已無未來行程，僅供檢視。');
+    if (recurrence && (!recurrence.weekdays.length || !recurrence.until)) {
+      throw new Error('請選擇至少一個星期與重複結束日期');
+    }
+    if (recurrence && !editing?.seriesId && recurrence.until < draft.start.slice(0, 10)) {
+      throw new Error('重複結束日期不得早於開始日期');
+    }
+    return { ...draft, recurrence, reminderAt: draft.reminderAt ? toInstant(draft.reminderAt) : null,
+      confirmationToken, start: toInstant(draft.start), end: toInstant(draft.end) };
+  }
   async function confirmEvent(checked: boolean) {
     setDraft(current => ({ ...current, confirmOverlap: checked }));
     if (!checked || confirmationToken) return;
     setSaving(true);
     try {
-      const input = { ...draft, reminderAt: draft.reminderAt ? toInstant(draft.reminderAt) : null, start: toInstant(draft.start), end: toInstant(draft.end) };
+      const input = eventInput();
       const disclosure = await request<ApiError>('/api/conflicts', 'POST', { kind: 'events', id: editing?.id, input });
       setConfirmationToken(disclosure.confirmationToken);
       setError(disclosure.conflicts?.length ? disclosure.error : '');
@@ -80,6 +101,7 @@ function App() {
   }
   function resetEditor(start = '') {
     setConfirmationToken(undefined);
+    setRecurrence(undefined);
     setEditing(null);
     setDraft({ title: '', start, end: start ? localTime(new Date(Date.parse(toInstant(start)) + 3600_000).toISOString()) : '', reminderAt: '', allDay: false, hidden: false, confirmOverlap: false });
   }
@@ -91,9 +113,14 @@ function App() {
   }
   function edit(event: PlannerEvent) {
     setConfirmationToken(undefined);
+    const next = event.seriesId && Date.parse(event.start) < Date.now()
+      ? events.filter(item => item.seriesId === event.seriesId && Date.parse(item.start) >= Date.now()).sort((a, b) => a.start.localeCompare(b.start))[0]
+      : undefined;
+    const template = next ?? event;
+    setRecurrence(template.recurrence ? { ...template.recurrence, weekdays: [...template.recurrence.weekdays] } : undefined);
     setTaskActive(false);
     setEditing(event);
-    setDraft({ title: event.title, start: localTime(event.start), end: localTime(event.end), reminderAt: event.reminderAt ? localTime(event.reminderAt) : '', allDay: event.allDay ?? false, hidden: event.hidden ?? false, confirmOverlap: false });
+    setDraft({ title: template.title, start: localTime(template.start), end: localTime(template.end), reminderAt: template.reminderAt ? localTime(template.reminderAt) : '', allDay: template.allDay ?? false, hidden: template.hidden ?? false, confirmOverlap: false });
     setError('');
     document.getElementById('event-editor')?.scrollIntoView({ block: 'center' });
   }
@@ -118,7 +145,7 @@ function App() {
     e.preventDefault(); setError('');
     setSaving(true);
     try {
-      const input: EventInput = { ...draft, reminderAt: draft.reminderAt ? toInstant(draft.reminderAt) : null, confirmationToken, start: toInstant(draft.start), end: toInstant(draft.end) };
+      const input = eventInput();
       await request<PlannerEvent>(editing ? `/api/events/${editing.id}` : '/api/events', editing ? 'PATCH' : 'POST', input);
       setEvents(await request<PlannerEvent[]>('/api/events'));
       resetEditor();
@@ -131,7 +158,7 @@ function App() {
     finally { setSaving(false); }
   }
   async function remove() {
-    if (!editing || !window.confirm(`刪除「${editing.title}」？`)) return;
+    if (!editing || finishedSeries || !window.confirm(editing.seriesId ? `刪除「${editing.title}」的未來系列行程與提醒？過去行程將保留。` : `刪除「${editing.title}」？`)) return;
     setError(''); setSaving(true);
     try {
       await request(`/api/events/${editing.id}`, 'DELETE');
@@ -161,17 +188,31 @@ function App() {
     <label className="confirm"><input type="checkbox" checked={showHidden} onChange={e => setShowHidden(e.target.checked)} />顯示隱藏行程</label>
     <Calendar view={view} date={date} events={events.filter(event => showHidden || !event.hidden)} onCreate={create} onEdit={edit} />
     <h2 id="event-editor">{editing ? '修改行程' : '新增行程'}</h2><p>時間以台北時區（UTC+8）輸入與顯示。點選時間格新增，或點選行程修改與刪除。</p><form onSubmit={save}>
-      <label>行程名稱<input name="title" maxLength={200} required value={draft.title} onFocus={() => setTaskActive(false)} onChange={e => setDraft({ ...draft, title: e.target.value })} /></label>
+      <label>行程名稱<input name="title" maxLength={200} required value={draft.title} onFocus={() => setTaskActive(false)} onChange={e => changeDraft({ title: e.target.value })} /></label>
       {!taskActive && <>
-      <label>開始時間<input name="start" type="datetime-local" required value={draft.start} onChange={e => { setConfirmationToken(undefined); setDraft({ ...draft, start: e.target.value, confirmOverlap: false }); }} /></label>
-      <label>結束時間<input name="end" type="datetime-local" required value={draft.end} onChange={e => { setConfirmationToken(undefined); setDraft({ ...draft, end: e.target.value, confirmOverlap: false }); }} /></label>
-      <label>行程提醒時間<input type="datetime-local" value={draft.reminderAt} onChange={e => setDraft({ ...draft, reminderAt: e.target.value })} /></label>
-      <label className="confirm"><input name="allDay" type="checkbox" checked={draft.allDay} onChange={e => setDraft({ ...draft, allDay: e.target.checked })} />全天</label>
+      <label>開始時間<input name="start" type="datetime-local" required value={draft.start} onChange={e => changeDraft({ start: e.target.value })} /></label>
+      <label>結束時間<input name="end" type="datetime-local" required value={draft.end} onChange={e => changeDraft({ end: e.target.value })} /></label>
+      <label>行程提醒時間<input type="datetime-local" value={draft.reminderAt} onChange={e => changeDraft({ reminderAt: e.target.value })} /></label>
+      <label className="confirm"><input name="allDay" type="checkbox" checked={draft.allDay} onChange={e => changeDraft({ allDay: e.target.checked })} />全天</label>
       {draft.allDay && <p>全天起訖須為台北時間午夜；結束日期不包含在行程內。</p>}
-      <label className="confirm"><input name="hidden" type="checkbox" checked={draft.hidden} onChange={e => setDraft({ ...draft, hidden: e.target.checked })} />隱藏行程</label>
+      <label className="confirm"><input name="hidden" type="checkbox" checked={draft.hidden} onChange={e => changeDraft({ hidden: e.target.checked })} />隱藏行程</label>
+      <label className="confirm"><input name="weekly" type="checkbox" disabled={saving || !!editing?.seriesId} checked={!!recurrence}
+        onChange={e => changeRecurrence(e.target.checked ? { frequency: 'weekly', weekdays: [], until: '' } : undefined)} />每週重複</label>
+      {recurrence && <fieldset disabled={saving || finishedSeries}>
+        <legend>重複星期</legend>
+        {([1, 2, 3, 4, 5, 6, 0] as const).map(day => <label className="confirm" key={day}>
+          <input type="checkbox" checked={recurrence.weekdays.includes(day)} onChange={e => changeRecurrence({ ...recurrence,
+            weekdays: e.target.checked ? [...recurrence.weekdays, day].sort((a, b) => a - b) : recurrence.weekdays.filter(value => value !== day) })} />
+          {['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'][day]}
+        </label>)}
+        <label>重複結束日期<input name="recurrenceUntil" type="date" required min={editing?.seriesId ? undefined : draft.start.slice(0, 10)} value={recurrence.until}
+          onChange={e => changeRecurrence({ ...recurrence, until: e.target.value })} /></label>
+      </fieldset>}
+      {editing?.seriesId && <p>儲存或刪除系列會更新未來行程與提醒，保留過去行程。</p>}
+      {editing?.seriesId && Date.parse(editing.start) < Date.now() && <p>{finishedSeries ? '此系列已無未來行程，僅供檢視。' : '已開啟過去行程；編輯欄位顯示下一筆未來行程的設定。'}</p>}
       <label className="confirm"><input name="confirmOverlap" type="checkbox" disabled={saving} checked={draft.confirmOverlap} onChange={e => { void confirmEvent(e.target.checked); }} />確認允許時段重疊</label>
-      <button disabled={saving}>儲存行程</button>
-      {editing && <button type="button" disabled={saving} onClick={remove}>刪除行程</button>}
+      <button disabled={saving || finishedSeries}>{editing?.seriesId ? '儲存系列' : '儲存行程'}</button>
+      {editing && <button type="button" disabled={saving || finishedSeries} onClick={remove}>{editing.seriesId ? '刪除系列' : '刪除行程'}</button>}
       <button type="button" disabled={saving} onClick={() => create()}>取消編輯</button>
       </>}
     </form>

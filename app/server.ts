@@ -5,13 +5,15 @@ import { randomBytes, randomUUID, scrypt as scryptCallback, timingSafeEqual, cre
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import type { AuthResponse, Credentials, EventInput, PlannerEvent, PlannerTask, TaskInput, TaskPatch, User } from './shared';
+import { InvalidRecurrence, taipeiDate, validRecurrence, weeklyOccurrences } from './recurrence.ts';
 
 const scrypt = promisify(scryptCallback);
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
 export interface RunningApp { url: string; close(): Promise<void> }
-interface EventRow { reminder_at?: Date | null; id: string; title: string; starts_at: Date; ends_at: Date; all_day: boolean; hidden: boolean }
-const toPlannerEvent = (row: EventRow): PlannerEvent => ({ ...(row.reminder_at && { reminderAt: row.reminder_at.toISOString() }), id: row.id, title: row.title, start: row.starts_at.toISOString(), end: row.ends_at.toISOString(), allDay: row.all_day, hidden: row.hidden });
+interface EventRow { reminder_at?: Date | null; id: string; title: string; starts_at: Date; ends_at: Date; all_day: boolean; hidden: boolean; series_id?: string | null; recurrence?: EventInput['recurrence'] | null; recurrence_anchor?: string | null }
+const eventColumns = 'id,title,starts_at,ends_at,all_day,hidden,reminder_at,series_id,recurrence,recurrence_anchor';
+const toPlannerEvent = (row: EventRow): PlannerEvent => ({ ...(row.reminder_at && { reminderAt: row.reminder_at.toISOString() }), ...(row.series_id && { seriesId: row.series_id }), ...(row.recurrence && { recurrence: row.recurrence }), id: row.id, title: row.title, start: row.starts_at.toISOString(), end: row.ends_at.toISOString(), allDay: row.all_day, hidden: row.hidden });
 interface TaskRow { reminder_at?: Date | null; id: string; title: string; starts_at: Date | null; ends_at: Date | null; completed: boolean }
 const toPlannerTask = (row: TaskRow): PlannerTask => ({ ...(row.reminder_at && { reminderAt: row.reminder_at.toISOString() }), id: row.id, title: row.title, start: row.starts_at?.toISOString() ?? null, end: row.ends_at?.toISOString() ?? null, completed: row.completed });
 function validReminder(value: unknown): boolean {
@@ -28,6 +30,7 @@ function validEvent(body: unknown): body is EventInput {
   if (!body || typeof body !== 'object') return false;
   const b = body as EventInput;
   return validReminder(b.reminderAt) && typeof b.title === 'string' && b.title.trim().length > 0 && b.title.length <= 200 &&
+    (b.recurrence === undefined || validRecurrence(b.recurrence)) &&
     typeof b.start === 'string' && typeof b.end === 'string' &&
     /T.*(?:Z|[+-]\d\d:\d\d)$/.test(b.start) && /T.*(?:Z|[+-]\d\d:\d\d)$/.test(b.end) &&
     Number.isFinite(Date.parse(b.start)) && Number.isFinite(Date.parse(b.end)) && Date.parse(b.start) < Date.parse(b.end) &&
@@ -39,7 +42,7 @@ function validEvent(body: unknown): body is EventInput {
       new Date(Date.parse(value) + 8 * 3600_000).toISOString().slice(11) === '00:00:00.000Z'));
 }
 
-export async function startApp(options: { databaseUrl: string; port?: number; host?: string }): Promise<RunningApp> {
+export async function startApp(options: { databaseUrl: string; port?: number; host?: string; now?: () => Date }): Promise<RunningApp> {
   const pool = new pg.Pool({ connectionString: options.databaseUrl });
   const confirmationKey = randomBytes(32);
   try {
@@ -59,6 +62,10 @@ export async function startApp(options: { databaseUrl: string; port?: number; ho
       ALTER TABLE events ADD COLUMN IF NOT EXISTS all_day boolean NOT NULL DEFAULT false;
       ALTER TABLE events ADD COLUMN IF NOT EXISTS hidden boolean NOT NULL DEFAULT false;
       ALTER TABLE events ADD COLUMN IF NOT EXISTS reminder_at timestamptz;
+      ALTER TABLE events ADD COLUMN IF NOT EXISTS series_id uuid;
+      ALTER TABLE events ADD COLUMN IF NOT EXISTS recurrence jsonb;
+      ALTER TABLE events ADD COLUMN IF NOT EXISTS recurrence_anchor text;
+      CREATE INDEX IF NOT EXISTS events_owner_series ON events(user_id, series_id);
       CREATE INDEX IF NOT EXISTS events_owner_time ON events(user_id, starts_at);
       CREATE TABLE IF NOT EXISTS tasks (
         id uuid PRIMARY KEY, user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -91,13 +98,13 @@ export async function startApp(options: { databaseUrl: string; port?: number; ho
     // Called under the account write lock, after reading the latest conflicts.
     // A signed snapshot binds consent to this session, operation and interval.
     function conflictResponse(req: express.Request, res: express.Response, input: EventInput | TaskInput,
-      conflicts: (PlannerEvent | PlannerTask)[], method = req.method, path = req.path) {
+      conflicts: (PlannerEvent | PlannerTask)[], method = req.method, path = req.path, batch?: unknown) {
       const snapshot = conflicts.map(item => [
         'allDay' in item ? 'event' : 'task', item.id, item.title, item.start, item.end,
       ]).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
       const confirmationToken = createHmac('sha256', confirmationKey).update(JSON.stringify([
         res.locals.user.id, digest(token(req)), method, path,
-        new Date(input.start!).toISOString(), new Date(input.end!).toISOString(), snapshot,
+        new Date(input.start!).toISOString(), new Date(input.end!).toISOString(), snapshot, ...(batch === undefined ? [] : [batch]),
       ])).digest('hex');
       return {
         error: '時段重疊：' + conflicts.map(item => `${item.title} (${item.start} – ${item.end})`).join('、'),
@@ -152,7 +159,7 @@ export async function startApp(options: { databaseUrl: string; port?: number; ho
       res.clearCookie('lp_session', cookieOptions).json({ ok: true });
     });
     app.get('/api/events', async (_req, res) => {
-      const result = await pool.query<EventRow>('SELECT id,title,starts_at,ends_at,all_day,hidden,reminder_at FROM events WHERE user_id=$1 ORDER BY starts_at,id', [res.locals.user.id]);
+      const result = await pool.query<EventRow>(`SELECT ${eventColumns} FROM events WHERE user_id=$1 ORDER BY starts_at,id`, [res.locals.user.id]);
       res.json(result.rows.map(toPlannerEvent));
     });
     app.get('/api/tasks', async (_req, res) => {
@@ -167,12 +174,94 @@ export async function startApp(options: { databaseUrl: string; port?: number; ho
         [userId, input.start, input.end, kind === 'tasks' ? id ?? null : null]);
       return [...events.rows.map(toPlannerEvent), ...tasks.rows.map(toPlannerTask)];
     }
+    interface EventPlan {
+      input: EventInput; previous?: PlannerEvent; seriesId?: string; anchor?: string;
+      entries: { id: string; input: EventInput }[]; replaceIds: string[];
+    }
+    async function planEvents(db: pg.PoolClient, userId: string, supplied: EventInput, id?: string): Promise<EventPlan | undefined> {
+      const owned = id ? await db.query<EventRow>(`SELECT ${eventColumns} FROM events WHERE id=$1 AND user_id=$2`, [id, userId]) : undefined;
+      if (id && !owned?.rows[0]) return undefined;
+      const row = owned?.rows[0];
+      const previous = row ? toPlannerEvent(row) : undefined;
+      const input = { ...supplied, hidden: supplied.hidden ?? previous?.hidden ?? false,
+        reminderAt: supplied.reminderAt === undefined ? previous?.reminderAt ?? null : supplied.reminderAt };
+      if (!row?.series_id && !input.recurrence) return { input, previous, entries: [{ id: id ?? randomUUID(), input }], replaceIds: id ? [id] : [] };
+      const members = row?.series_id ? (await db.query<EventRow>(`SELECT ${eventColumns} FROM events WHERE user_id=$1 AND series_id=$2 ORDER BY starts_at,id`, [userId, row.series_id])).rows : row ? [row] : [];
+      const cutoff = row?.series_id ? (options.now?.() ?? new Date()).getTime() : -Infinity;
+      const future = members.filter(member => member.starts_at.getTime() >= cutoff);
+      input.recurrence = supplied.recurrence ?? future[0]?.recurrence ?? row?.recurrence ?? undefined;
+      if (!input.recurrence || !validRecurrence(input.recurrence)) throw new InvalidRecurrence('請輸入有效的每週重複設定');
+      // A historical snapshot cannot bring back a deleted or completed series.
+      if (row?.series_id && !future.length) return { input, previous, seriesId: row.series_id,
+        anchor: row.recurrence_anchor ?? undefined, entries: [], replaceIds: [] };
+      if (supplied.reminderAt === undefined && previous?.reminderAt) {
+        input.reminderAt = new Date(Date.parse(input.start) + Date.parse(previous.reminderAt) - Date.parse(previous.start)).toISOString();
+      }
+      const anchor = row?.recurrence_anchor ?? taipeiDate(input.start);
+      const pastDates = new Set(members.filter(member => member.starts_at.getTime() < cutoff)
+        .map(member => taipeiDate(member.starts_at.toISOString())));
+      const occurrences = weeklyOccurrences(input, anchor, cutoff).filter(item => !pastDates.has(taipeiDate(item.start)));
+      if (!row?.series_id && !occurrences.length) throw new InvalidRecurrence('選定範圍內沒有重複日期');
+      const existingDates = new Map(future.map(member => [taipeiDate(member.starts_at.toISOString()), member.id]));
+      return { input, previous, seriesId: row?.series_id ?? randomUUID(), anchor,
+        entries: occurrences.map(input => ({ id: existingDates.get(taipeiDate(input.start)) ?? randomUUID(), input })),
+        replaceIds: future.map(member => member.id) };
+    }
+    async function eventPlanConflicts(db: pg.PoolClient, userId: string, plan: EventPlan) {
+      if (!plan.entries.length) return [];
+      const starts = plan.entries.map(entry => entry.input.start);
+      const ends = plan.entries.map(entry => entry.input.end);
+      const overlap = 'EXISTS (SELECT 1 FROM unnest($2::timestamptz[],$3::timestamptz[]) AS slots(start_time,end_time) WHERE starts_at<slots.end_time AND ends_at>slots.start_time)';
+      const events = await db.query<EventRow>(`SELECT ${eventColumns} FROM events WHERE user_id=$1 AND NOT (id=ANY($4::uuid[])) AND ${overlap} ORDER BY starts_at,id`, [userId, starts, ends, plan.replaceIds]);
+      const tasks = await db.query<TaskRow>(`SELECT id,title,starts_at,ends_at,completed,reminder_at FROM tasks WHERE user_id=$1 AND ${overlap} ORDER BY starts_at,id`, [userId, starts, ends]);
+      // Planned occurrences can overlap one another before any row exists.
+      // Disclosure IDs derive from intervals so preview and write consent agree.
+      const internal = new Map<string, PlannerEvent>();
+      const candidates = plan.entries.map(({ input }) => ({ input, start: Date.parse(input.start), end: Date.parse(input.end) }))
+        .sort((a, b) => a.start - b.start);
+      function disclose(input: EventInput) {
+        const hash = digest(`planned:${input.start}:${input.end}`);
+        const id = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-${hash.slice(12, 16)}-${hash.slice(16, 20)}-${hash.slice(20, 32)}`;
+        internal.set(id, { id, title: input.title.trim(), start: input.start, end: input.end,
+          allDay: input.allDay ?? false, hidden: input.hidden ?? false });
+      }
+      for (let i = 0; i < candidates.length; i++) {
+        for (let j = i + 1; j < candidates.length && candidates[j].start < candidates[i].end; j++) {
+          disclose(candidates[i].input); disclose(candidates[j].input);
+        }
+      }
+      return [...events.rows.map(toPlannerEvent), ...tasks.rows.map(toPlannerTask), ...internal.values()];
+    }
+    function eventPlanResponse(req: express.Request, res: express.Response, plan: EventPlan,
+      conflicts: (PlannerEvent | PlannerTask)[], method = req.method, path = req.path) {
+      const batch = plan.seriesId ? [plan.input.recurrence, [...plan.replaceIds].sort(), plan.entries.map(({ input }) => [
+        input.title, input.start, input.end, input.reminderAt, input.allDay ?? false, input.hidden ?? false,
+      ])] : undefined;
+      return conflictResponse(req, res, plan.input, conflicts, method, path, batch);
+    }
     // Read-only disclosure for users who check confirmation before their first save.
     // The subsequent write still rechecks under the account lock.
     app.post('/api/conflicts', async (req, res) => {
       const { kind, id, input } = req.body ?? {};
       if (!['events', 'tasks'].includes(kind) || (id !== undefined && (typeof id !== 'string' || !uuidPattern.test(id))) || !validEvent(input)) {
         res.status(400).json({ error: '請輸入有效的衝突查詢時段' }); return;
+      }
+      if (kind === 'events') {
+        const client = await pool.connect();
+        try {
+          await client.query('BEGIN');
+          await client.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [res.locals.user.id]);
+          const plan = await planEvents(client, res.locals.user.id, input, id);
+          if (!plan) { await client.query('ROLLBACK'); res.status(404).json({ error: '找不到行程' }); return; }
+          const conflicts = await eventPlanConflicts(client, res.locals.user.id, plan);
+          const response = eventPlanResponse(req, res, plan, conflicts, id ? 'PATCH' : 'POST', `/api/events${id ? `/${id}` : ''}`);
+          await client.query('COMMIT'); res.json(response);
+        } catch (error) {
+          await client.query('ROLLBACK');
+          if (error instanceof InvalidRecurrence) { res.status(400).json({ error: error.message }); return; }
+          throw error;
+        } finally { client.release(); }
+        return;
       }
       const conflicts = await findConflicts(pool, res.locals.user.id, input, kind, id);
       res.json(conflictResponse(req, res, input, conflicts,
@@ -218,7 +307,7 @@ export async function startApp(options: { databaseUrl: string; port?: number; ho
     }
     app.get('/api/events/:id', async (req, res) => {
       if (!uuidPattern.test(String(req.params.id))) { res.status(404).json({ error: '找不到行程' }); return; }
-      const result = await pool.query<EventRow>('SELECT id,title,starts_at,ends_at,all_day,hidden,reminder_at FROM events WHERE id=$1 AND user_id=$2', [req.params.id, res.locals.user.id]);
+      const result = await pool.query<EventRow>(`SELECT ${eventColumns} FROM events WHERE id=$1 AND user_id=$2`, [req.params.id, res.locals.user.id]);
       if (!result.rows[0]) { res.status(404).json({ error: '找不到行程' }); return; }
       res.json(toPlannerEvent(result.rows[0]));
     });
@@ -226,39 +315,67 @@ export async function startApp(options: { databaseUrl: string; port?: number; ho
     app.patch('/api/events/:id', saveEvent);
     async function saveEvent(req: express.Request, res: express.Response) {
       const updating = req.method === 'PATCH';
-      const id = updating ? String(req.params.id) : randomUUID();
-      if (!uuidPattern.test(id)) { res.status(404).json({ error: '找不到行程' }); return; }
+      const id = updating ? String(req.params.id) : undefined;
+      if (id && !uuidPattern.test(id)) { res.status(404).json({ error: '找不到行程' }); return; }
+      if (!validEvent(req.body)) { res.status(400).json({ error: '請輸入名稱及有效的起訖時間，結束須晚於開始；全天起訖須為台北時間午夜' }); return; }
       const client = await pool.connect();
-      let previousHidden = false;
-      let previousReminder: Date | null = null;
       try {
         await client.query('BEGIN');
-        // Serialize writes per account; concurrent inserts cannot bypass conflict checks.
+        // Every writer, including deletion, uses the same account-scoped lock.
         await client.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [res.locals.user.id]);
-        if (updating) {
-          const owned = await client.query('SELECT id,hidden,reminder_at FROM events WHERE id=$1 AND user_id=$2', [id, res.locals.user.id]);
-          previousHidden = owned.rows[0]?.hidden ?? false;
-          previousReminder = owned.rows[0]?.reminder_at ?? null;
-          if (!owned.rowCount) { await client.query('ROLLBACK'); res.status(404).json({ error: '找不到行程' }); return; }
+        const plan = await planEvents(client, res.locals.user.id, req.body, id);
+        if (!plan) { await client.query('ROLLBACK'); res.status(404).json({ error: '找不到行程' }); return; }
+        const conflicts = await eventPlanConflicts(client, res.locals.user.id, plan);
+        const response = eventPlanResponse(req, res, plan, conflicts);
+        if (conflicts.length && !(plan.input.confirmOverlap && plan.input.confirmationToken === response.confirmationToken)) {
+          await client.query('ROLLBACK'); res.status(409).json(response); return;
         }
-        if (!validEvent(req.body)) { await client.query('ROLLBACK'); res.status(400).json({ error: '請輸入名稱及有效的起訖時間，結束須晚於開始；全天起訖須為台北時間午夜' }); return; }
-        const input: EventInput = req.body;
-        const conflicts = await findConflicts(client, res.locals.user.id, input, 'events', id);
-        if (needsConfirmation(req, res, input, conflicts)) {
-          await client.query('ROLLBACK'); return;
+        const keptIds = plan.entries.map(entry => entry.id);
+        await client.query('DELETE FROM events WHERE user_id=$1 AND id=ANY($2::uuid[]) AND NOT (id=ANY($3::uuid[]))', [res.locals.user.id, plan.replaceIds, keptIds]);
+        let saved: PlannerEvent | undefined;
+        if (plan.entries.length) {
+          const result = await client.query<EventRow>(`
+            INSERT INTO events(id,user_id,title,starts_at,ends_at,all_day,hidden,reminder_at,series_id,recurrence,recurrence_anchor)
+            SELECT item.id,$1,item.title,item.starts_at,item.ends_at,item.all_day,item.hidden,item.reminder_at,$9,$10::jsonb,$11
+            FROM unnest($2::uuid[],$3::text[],$4::timestamptz[],$5::timestamptz[],$6::boolean[],$7::boolean[],$8::timestamptz[])
+              AS item(id,title,starts_at,ends_at,all_day,hidden,reminder_at)
+            WHERE true
+            ON CONFLICT(id) DO UPDATE SET title=EXCLUDED.title,starts_at=EXCLUDED.starts_at,ends_at=EXCLUDED.ends_at,
+              all_day=EXCLUDED.all_day,hidden=EXCLUDED.hidden,reminder_at=EXCLUDED.reminder_at,
+              series_id=EXCLUDED.series_id,recurrence=EXCLUDED.recurrence,recurrence_anchor=EXCLUDED.recurrence_anchor
+              WHERE events.user_id=EXCLUDED.user_id
+            RETURNING ${eventColumns}`, [res.locals.user.id, keptIds,
+            plan.entries.map(entry => entry.input.title.trim()), plan.entries.map(entry => entry.input.start),
+            plan.entries.map(entry => entry.input.end), plan.entries.map(entry => entry.input.allDay ?? false),
+            plan.entries.map(entry => entry.input.hidden ?? false), plan.entries.map(entry => entry.input.reminderAt ?? null),
+            plan.seriesId ?? null, plan.input.recurrence ? JSON.stringify(plan.input.recurrence) : null, plan.anchor ?? null]);
+          saved = toPlannerEvent(result.rows.sort((a, b) => a.starts_at.getTime() - b.starts_at.getTime())[0]);
         }
-        const reminderAt = input.reminderAt === undefined ? previousReminder : input.reminderAt;
-        const result = updating
-          ? await client.query<EventRow>('UPDATE events SET title=$3,starts_at=$4,ends_at=$5,all_day=$6,hidden=$7,reminder_at=$8 WHERE id=$1 AND user_id=$2 RETURNING id,title,starts_at,ends_at,all_day,hidden,reminder_at', [id, res.locals.user.id, input.title.trim(), input.start, input.end, input.allDay ?? false, input.hidden ?? previousHidden, reminderAt])
-          : await client.query<EventRow>('INSERT INTO events(id,user_id,title,starts_at,ends_at,all_day,hidden,reminder_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id,title,starts_at,ends_at,all_day,hidden,reminder_at', [id, res.locals.user.id, input.title.trim(), input.start, input.end, input.allDay ?? false, input.hidden ?? previousHidden, reminderAt]);
-        await client.query('COMMIT'); res.status(updating ? 200 : 201).json(toPlannerEvent(result.rows[0]));
-      } catch (error) { await client.query('ROLLBACK'); throw error; }
-      finally { client.release(); }
+        await client.query('COMMIT'); res.status(updating ? 200 : 201).json(saved ?? plan.previous);
+      } catch (error) {
+        await client.query('ROLLBACK');
+        if (error instanceof InvalidRecurrence) { res.status(400).json({ error: error.message }); return; }
+        throw error;
+      } finally { client.release(); }
     }
     app.delete('/api/events/:id', async (req, res) => {
       if (!uuidPattern.test(String(req.params.id))) { res.status(404).json({ error: '找不到行程' }); return; }
-      const result = await pool.query('DELETE FROM events WHERE id=$1 AND user_id=$2', [req.params.id, res.locals.user.id]);
-      res.status(result.rowCount ? 200 : 404).json(result.rowCount ? { ok: true } : { error: '找不到行程' });
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [res.locals.user.id]);
+        const owned = await client.query<EventRow>(`SELECT ${eventColumns} FROM events WHERE id=$1 AND user_id=$2`, [req.params.id, res.locals.user.id]);
+        const row = owned.rows[0];
+        if (!row) { await client.query('ROLLBACK'); res.status(404).json({ error: '找不到行程' }); return; }
+        if (row.series_id) {
+          const cutoff = options.now?.() ?? new Date();
+          await client.query('DELETE FROM events WHERE user_id=$1 AND series_id=$2 AND starts_at >= $3', [res.locals.user.id, row.series_id, cutoff]);
+        } else {
+          await client.query('DELETE FROM events WHERE id=$1 AND user_id=$2', [req.params.id, res.locals.user.id]);
+        }
+        await client.query('COMMIT'); res.json({ ok: true });
+      } catch (error) { await client.query('ROLLBACK'); throw error; }
+      finally { client.release(); }
     });
     app.use('/api', (_req, res) => { res.status(404).json({ error: '找不到 API' }); });
     app.get('/assets/app.js', (_req, res) => { res.type('js').send(js); });
