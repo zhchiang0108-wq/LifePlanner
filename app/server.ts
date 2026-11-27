@@ -216,21 +216,24 @@ export async function startApp(options: { databaseUrl: string; port?: number; ho
       const tasks = await db.query<TaskRow>(`SELECT id,title,starts_at,ends_at,completed,reminder_at FROM tasks WHERE user_id=$1 AND ${overlap} ORDER BY starts_at,id`, [userId, starts, ends]);
       // Planned occurrences can overlap one another before any row exists.
       // Disclosure IDs derive from intervals so preview and write consent agree.
-      const internal = new Map<string, PlannerEvent>();
+      const internal: PlannerEvent[] = [];
       const candidates = plan.entries.map(({ input }) => ({ input, start: Date.parse(input.start), end: Date.parse(input.end) }))
         .sort((a, b) => a.start - b.start);
-      function disclose(input: EventInput) {
+      let previousMaxEnd = -Infinity;
+      for (const [index, candidate] of candidates.entries()) {
+        // A sorted interval overlaps a prior interval exactly when their maximum
+        // end exceeds its start, or a later one when the next start is before its end.
+        const overlapsPrevious = previousMaxEnd > candidate.start;
+        previousMaxEnd = Math.max(previousMaxEnd, candidate.end);
+        const next = candidates[index + 1];
+        if (!overlapsPrevious && (!next || next.start >= candidate.end)) continue;
+        const { input } = candidate;
         const hash = digest(`planned:${input.start}:${input.end}`);
         const id = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-${hash.slice(12, 16)}-${hash.slice(16, 20)}-${hash.slice(20, 32)}`;
-        internal.set(id, { id, title: input.title.trim(), start: input.start, end: input.end,
+        internal.push({ id, title: input.title.trim(), start: input.start, end: input.end,
           allDay: input.allDay ?? false, hidden: input.hidden ?? false });
       }
-      for (let i = 0; i < candidates.length; i++) {
-        for (let j = i + 1; j < candidates.length && candidates[j].start < candidates[i].end; j++) {
-          disclose(candidates[i].input); disclose(candidates[j].input);
-        }
-      }
-      return [...events.rows.map(toPlannerEvent), ...tasks.rows.map(toPlannerTask), ...internal.values()];
+      return [...events.rows.map(toPlannerEvent), ...tasks.rows.map(toPlannerTask), ...internal];
     }
     function eventPlanResponse(req: express.Request, res: express.Response, plan: EventPlan,
       conflicts: (PlannerEvent | PlannerTask)[], method = req.method, path = req.path) {
